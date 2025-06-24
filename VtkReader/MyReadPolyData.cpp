@@ -37,7 +37,7 @@
 // 3. Don't use lookuptable when use mapper
 // 4. Don't use forced map when use mapper
 // 5. Don't use vtk array when use mapper
-#if 0 // use PolyMapper
+#if 0 // Use PolyMapper
 #define USE_GENERIC_FULL_POLY_READER 0
 #define USE_POLYMAPPER 1
 #define USE_MAPPER_AUTO_MAP_COLORS 1
@@ -89,8 +89,10 @@ int main(int argc, char* argv[])
   std::mt19937 mt(4355412); // Standard mersenne_twister_engine
   std::uniform_real_distribution<double> distribution(0.6, 1.0);
 
+  #if 1 //DEBUG
   argc = 2;
   argv[1] = const_cast<char*>("/home/dragontesa/314/etri/data/vtk/legacy/cube-colortable-correct.vtk");
+  #endif
 
   // PolyData file pipeline
   for (int i = 1; i < argc; ++i)
@@ -218,10 +220,13 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
   }
   else
   {
-    std::cerr << "MyRead okay point scalars" << ", numComp="
+    std::cerr << "MyRead okay point scalars" << ": numComp="
     << pointScalars->GetNumberOfComponents() << ", numTuple="
     << pointScalars->GetNumberOfTuples() << std::endl;
-    pointColorArray = vtkUnsignedCharArray::SafeDownCast(pointScalars);
+    pointColorArray = vtkUnsignedCharArray::SafeDownCast(pointScalars); // Cast failed
+    if (!pointColorArray) {
+      std::cerr << "point color array none" << std::endl;
+    }
   }
 
   vtkDataArray* cellScalars = cellData->GetScalars();
@@ -232,10 +237,18 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
   }
   else
   {
-    std::cerr << "MyRead okay cell scalars" << ", numComp="
+    std::cerr << "MyRead okay cell scalars" << ": numComp="
     << cellScalars->GetNumberOfComponents() << ", numTuple="
     << cellScalars->GetNumberOfTuples() << std::endl;
-    cellColorArray = vtkUnsignedCharArray::SafeDownCast(cellScalars);
+    cellColorArray = vtkUnsignedCharArray::SafeDownCast(cellScalars); // Cast failed
+    if (!cellColorArray) {
+      std::cerr << "cell color array none" << std::endl;
+    }
+    else {
+      std::cerr << "MyRead okay cell color array" << ": numComp="
+    << cellColorArray->GetNumberOfComponents() << ", numTuple="
+    << cellColorArray->GetNumberOfTuples() << std::endl;
+    }
   }
   
   

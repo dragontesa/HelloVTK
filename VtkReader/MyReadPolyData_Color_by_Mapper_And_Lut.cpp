@@ -37,7 +37,7 @@
 // 3. Don't use lookuptable when use mapper
 // 4. Don't use forced map when use mapper
 // 5. Don't use vtk array when use mapper
-#if 0 // use PolyMapper
+#if 1 // Use PolyMapper
 #define USE_GENERIC_FULL_POLY_READER 0
 #define USE_POLYMAPPER 1
 #define USE_MAPPER_AUTO_MAP_COLORS 1
@@ -89,8 +89,10 @@ int main(int argc, char* argv[])
   std::mt19937 mt(4355412); // Standard mersenne_twister_engine
   std::uniform_real_distribution<double> distribution(0.6, 1.0);
 
+  #if DEBUG
   argc = 2;
   argv[1] = const_cast<char*>("/home/dragontesa/314/etri/data/vtk/legacy/cube-colortable-correct.vtk");
+  #endif
 
   // PolyData file pipeline
   for (int i = 1; i < argc; ++i)
@@ -316,7 +318,7 @@ vtkSmartPointer<vtkPolyData> MyReadPolyData(const char* fileName)
             {
                 #if USE_MAPPER_AUTO_MAP_COLORS // exactly using mapper
                     unsigned char rgb[3];
-                    mappedColorData->GetTypedTuple(i, rgb);
+                    mappedColorData->GetTypedTuple(i, rgb); // Crash
                     color[0] = rgb[0] / 255.0f; // r
                     color[1] = rgb[1] / 255.0f; // g
                     color[2] = rgb[2] / 255.0f; // b
