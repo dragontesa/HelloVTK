@@ -13,6 +13,7 @@
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
 #include <vtkSphereSource.h>
@@ -24,6 +25,7 @@
 #include <vtkCleanPolyData.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkLookupTable.h>
+#include <vtkFloatArray.h>
 
 #include <algorithm>
 #include <array>
@@ -58,6 +60,25 @@
 
 using FVector = vtkVector<float,3>;
 using FVector2D = vtkVector<float,2>;
+
+
+class MyCustomInteractorStyle : public vtkInteractorStyleTrackballCamera {
+public:
+    static MyCustomInteractorStyle* New();
+    vtkTypeMacro(MyCustomInteractorStyle, vtkInteractorStyleTrackballCamera);
+
+    virtual void OnKeyPress() override {
+        std::string key = this->Interactor->GetKeySym();
+        if (key == "q") {
+            std::cout << "DEBUG: 'Q' key pressed! Performing custom action (e.g., quitting, or toggling feature)." << std::endl;
+        } else if (key == "c") {
+            std::cout << "DEBUG: 'C' key pressed! Custom action for 'c' key." << std::endl;
+        }
+        vtkInteractorStyleTrackballCamera::OnKeyPress();
+    }
+};
+vtkStandardNewMacro(MyCustomInteractorStyle);
+
 namespace {
 
 vtkSmartPointer<vtkPolyData> MyReadPolyData(const char* fileName);
@@ -78,6 +99,8 @@ int main(int argc, char* argv[])
 
   vtkNew<vtkRenderWindowInteractor> interactor;
   interactor->SetRenderWindow(renderWindow);
+  vtkNew<MyCustomInteractorStyle> style;
+  interactor->SetInteractorStyle(style);
 
   // renderer->SetViewport(0.0, 0.0, 1.0, 1.0); // Example: Full Window for 3D
   renderer->SetBackground(colors->GetColor3d("Wheat").GetData());
@@ -89,13 +112,14 @@ int main(int argc, char* argv[])
   std::mt19937 mt(4355412); // Standard mersenne_twister_engine
   std::uniform_real_distribution<double> distribution(0.6, 1.0);
 
-  #if 1 //DEBUG
-  argc = 2;
-  argv[1] = const_cast<char*>("/home/dragontesa/314/etri/data/vtk/legacy/cube-colortable-correct.vtk");
+  #if DEBUG
+   std::string vtkFileName = const_cast<char*>("/home/dragontesa/314/etri/data/vtk/legacy/cube-colortable-correct.vtk");
   #endif
 
   // PolyData file pipeline
-  for (int i = 1; i < argc; ++i)
+  int nBegin = 1;
+  nBegin += (argc>2);
+  for (int i = nBegin; i < argc; ++i)
   {
     std::cout << "Loading: " << argv[i] << std::endl;
     auto polyData = MyReadPolyData(argv[i]);
@@ -115,14 +139,14 @@ int main(int argc, char* argv[])
 
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
-    actor->SetBackfaceProperty(backProp);
-    actor->GetProperty()->SetDiffuseColor(randomColor.data());
+    // actor->SetBackfaceProperty(backProp);
+    // actor->GetProperty()->SetDiffuseColor(randomColor.data());
     actor->GetProperty()->SetSpecular(0.3);
     actor->GetProperty()->SetSpecularPower(30);
     renderer->AddActor(actor);
   }
 
-  renderWindow->SetWindowName("ReadAllPolyDataTypes");
+  renderWindow->SetWindowName("VtkPolyDataRader");
   renderWindow->Render();
   interactor->Start();
 
@@ -250,9 +274,42 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
     << cellColorArray->GetNumberOfTuples() << std::endl;
     }
   }
-  
+
+  // Cell Fields and single component
+  vtkFieldData* cellField  = poly->GetCellData();
+  vtkDataArray* faceAttributesFieldArray = cellField->GetArray("faceAttributes");
+  if (!faceAttributesFieldArray) {
+        std::cerr << "Error: 'faceAttributes' array not found in Cell FieldData!" << std::endl;
+        std::remove(fileName);
+        return poly;
+  }
+
+  // Since faceAttributes has 2 components per cell (e.g., value and something else),
+  // we need to extract a single component to use for coloring with a 1D lookup table.
+  // Let's use the first component (index 0) for coloring.
+    vtkNew<vtkFloatArray> coloringScalars;
+    coloringScalars->SetName("FaceColoringScalars");
+    coloringScalars->SetNumberOfComponents(1);
+    coloringScalars->SetNumberOfValues(poly->GetNumberOfCells());
+
+    double rangeMin = VTK_FLOAT_MAX;
+    double rangeMax = VTK_FLOAT_MIN;
+
+    for (vtkIdType i = 0; i < poly->GetNumberOfCells(); ++i) {
+        double val = faceAttributesFieldArray->GetComponent(i, 0); // Get the first component
+        coloringScalars->SetValue(i, val);
+        if (val < rangeMin) rangeMin = val;
+        if (val > rangeMax) rangeMax = val;
+    }
+    std::cout << "Extracted 'FaceColoringScalars' from 'faceAttributes' component 0." << std::endl;
+    std::cout << "  Scalar range for coloring: [" << rangeMin << ", " << rangeMax << "]" << std::endl;
+
+    // Add this new scalar array to the CellData as the active scalars for coloring
+    poly->GetCellData()->SetScalars(coloringScalars);
+ 
   
   // 3. Colors
+     cellScalars = poly->GetCellData()->GetScalars();
     // vtkSmartPointer<vtkLookupTable> lut = vtkSmartPointer<vtkLookupTable>::New();
     vtkSmartPointer<vtkScalarsToColors> lut = nullptr;
     if (pointScalars) {

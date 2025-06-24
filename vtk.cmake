@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.20)
 
 # cmake -DVTK_DIR=/path/to/your/vtk/installation/lib/cmake/vtk-9.0 ..
 set(VTK_DIR "/opt/vtk/9.4.1/lib64/cmake/vtk-9.4")

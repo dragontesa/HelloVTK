@@ -4,6 +4,7 @@
 
 add_executable(VtkReader)
 add_executable(MyReadPolyDataMapper MyReadPolyData_Color_by_Mapper_And_Lut.cpp)
+add_executable(Gemini_VtkPolyMeshViewer Gemini_VtkPolyMeshViewer.cpp)
 
 target_compile_features(VtkReader PUBLIC cxx_std_20)
 target_compile_definitions(VtkReader PUBLIC BUILD_API)
@@ -41,4 +42,7 @@ target_link_libraries(VtkReader PRIVATE ${VTK_LIBRARIES})
 
 target_link_directories(MyReadPolyDataMapper PUBLIC "${VTK_LIBS}")
 target_link_libraries(MyReadPolyDataMapper PRIVATE ${VTK_LIBRARIES})
+
+target_link_directories(Gemini_VtkPolyMeshViewer PUBLIC "${VTK_LIBS}")
+target_link_libraries(Gemini_VtkPolyMeshViewer PRIVATE ${VTK_LIBRARIES})
 
