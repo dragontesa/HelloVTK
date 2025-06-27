@@ -18,6 +18,7 @@ target_include_directories(VtkReader PUBLIC
 list(APPEND private_header_list
 )
 list(APPEND target_source_list
+  CreateVtkLookupTable.cpp
   MyReadPolyData.cpp
   #ReadAllPolyDataTypes.cxx
 )

@@ -5,6 +5,7 @@
 #include <vtkPolyDataReader.h>
 #include <vtkSTLReader.h>
 #include <vtkXMLPolyDataReader.h>
+#include <vtkDataSetMapper.h>
 
 #include <vtkActor.h>
 #include <vtkCamera.h>
@@ -19,6 +20,7 @@
 #include <vtkSphereSource.h>
 #include <vtksys/SystemTools.hxx>
 
+#include <vtkUnstructuredGrid.h>
 #include <vtkPointData.h>
 #include <vtkCellData.h>
 #include <vtkTriangleFilter.h>
@@ -26,6 +28,8 @@
 #include <vtkPolyDataNormals.h>
 #include <vtkLookupTable.h>
 #include <vtkFloatArray.h>
+#include <vtkTessellatorFilter.h>
+
 
 #include <algorithm>
 #include <array>
@@ -79,87 +83,93 @@ public:
 };
 vtkStandardNewMacro(MyCustomInteractorStyle);
 
-namespace {
-
 vtkSmartPointer<vtkPolyData> MyReadPolyData(const char* fileName);
-
-}
-
+vtkSmartPointer<vtkLookupTable> create_lookup_table_from_vtk(const std::string& vtkFilePath, const std::string& tableName);
 
 int main(int argc, char* argv[])
 {
-      // Vis Pipeline
-  vtkNew<vtkNamedColors> colors;
+  // Visualize
+    // 렌더러
+    vtkNew<vtkNamedColors> colors;
+    vtkNew<vtkRenderer> renderer;
 
-  vtkNew<vtkRenderer> renderer;
+    // 렌더 윈도우
+    vtkNew<vtkRenderWindow> renderWindow;
+    renderWindow->SetSize(640, 480);
+    renderWindow->AddRenderer(renderer);
+  
+    // 윈도우 인터렉터
+    vtkNew<vtkRenderWindowInteractor> interactor;
+    interactor->SetRenderWindow(renderWindow);
+    vtkNew<MyCustomInteractorStyle> style;
+    interactor->SetInteractorStyle(style);
+  
+    // 카메라
+    // renderer->ResetCamera();
+    // renderer->SetViewport(0.0, 0.0, 1.0, 1.0); // Example: Full Window for 3D
 
-  vtkNew<vtkRenderWindow> renderWindow;
-  renderWindow->SetSize(640, 480);
-  renderWindow->AddRenderer(renderer);
 
-  vtkNew<vtkRenderWindowInteractor> interactor;
-  interactor->SetRenderWindow(renderWindow);
-  vtkNew<MyCustomInteractorStyle> style;
-  interactor->SetInteractorStyle(style);
-
-  // renderer->SetViewport(0.0, 0.0, 1.0, 1.0); // Example: Full Window for 3D
-  renderer->SetBackground(colors->GetColor3d("Wheat").GetData());
-  renderer->UseHiddenLineRemovalOn();
-
-  // Note: If a Python version is written, it is probably best to use
-  //       vtkMinimalStandardRandomSequence in it and here, to ensure
-  //       that the random number generation is the same.
-  std::mt19937 mt(4355412); // Standard mersenne_twister_engine
-  std::uniform_real_distribution<double> distribution(0.6, 1.0);
-
-  #if DEBUG
-   std::string vtkFileName = const_cast<char*>("/home/dragontesa/314/etri/data/vtk/legacy/cube-colortable-correct.vtk");
-  #endif
-
-  // PolyData file pipeline
-  int nBegin = 1;
-  nBegin += (argc>2);
+  // support multiple pipeline
+  int nBegin = 1 + (argc>2);
   for (int i = nBegin; i < argc; ++i)
   {
     std::cout << "Loading: " << argv[i] << std::endl;
-    auto polyData = MyReadPolyData(argv[i]);
+    std::string vtkFileName = argv[i];
+    auto polyData = MyReadPolyData(vtkFileName.c_str());
 
-    // Visualize
-    vtkNew<vtkPolyDataMapper> mapper;
-    mapper->SetInputData(polyData);
+    // 1. 셀 격자화
+    vtkNew<vtkTessellatorFilter> tessel;
+    tessel->SetInputData(polyData);
+    tessel->SetMaximumNumberOfSubdivisions(3); // 3 x 3 격자
+    tessel->Update();
+    auto processedData = tessel->GetOutput();
+    std::cerr << "After Tessel, numcell= " << (int)processedData->GetNumberOfCells() << std::endl;
 
-    std::array<double, 3> randomColor;
-    randomColor[0] = distribution(mt);
-    randomColor[1] = distribution(mt);
-    randomColor[2] = distribution(mt);
-    vtkNew<vtkProperty> backProp;
-    backProp->SetDiffuseColor(colors->GetColor3d("Banana").GetData());
-    backProp->SetSpecular(0.6);
-    backProp->SetSpecularPower(30);
+    
+    // 2. 매퍼 설정
+    std::string scalarName("custom_table_scalars");
+    vtkNew<vtkDataSetMapper> mapper;
+    mapper->SetInputData(processedData);
+    mapper->SetScalarModeToUsePointData();
+    mapper->SelectColorArray(scalarName.c_str());
+    mapper->SetScalarVisibility(true);
+    mapper->InterpolateScalarsBeforeMappingOn(); // 색상 보간
+    
+    // 3. 스칼라 범위
+    double* scalRange = polyData->GetPointData()->GetArray(scalarName.c_str())->GetRange();
+    std::cerr << "Scalar ranges: [ " << scalRange[0] << ", " << scalRange[1] << " ]" << std::endl;
 
+    // 4. 색상 테이블
+    vtkSmartPointer<vtkLookupTable> lut = create_lookup_table_from_vtk(vtkFileName,"my_table");
+    lut->SetTableRange(scalRange[0], scalRange[1]);
+    mapper->SetLookupTable(lut);
+
+    // 5. 액터
     vtkNew<vtkActor> actor;
     actor->SetMapper(mapper);
+    actor->GetProperty()->SetRepresentationToSurface();
+    actor->GetProperty()->EdgeVisibilityOn();
+    actor->GetProperty()->SetEdgeColor(0.0, 0.0, 0.0); // # 검정 테두리
+    actor->GetProperty()->SetLineWidth(2.0); //  # 테두리 두께
+    // actor->GetProperty()->SetSpecular(0.3);
+    // actor->GetProperty()->SetSpecularPower(30);
     // actor->SetBackfaceProperty(backProp);
     // actor->GetProperty()->SetDiffuseColor(randomColor.data());
-    actor->GetProperty()->SetSpecular(0.3);
-    actor->GetProperty()->SetSpecularPower(30);
+
+    // 6. 렌더러에 액터 추가
+    renderer->SetBackground(colors->GetColor3d("Wheat").GetData());
+    renderer->UseHiddenLineRemovalOn();
     renderer->AddActor(actor);
+   
   }
 
-  renderWindow->SetWindowName("VtkPolyDataRader");
+  renderWindow->SetWindowName("VTK Visualizer");
   renderWindow->Render();
   interactor->Start();
 
   return EXIT_SUCCESS;
 }
 
-
-namespace {
-vtkUnsignedCharArray* MapScalarsFromPolyData(
-    vtkPolyData* poly,
-    const char* scalarName,
-    bool useCellData
-);
 
 vtkSmartPointer<vtkPolyData> MyReadPolyData(const char* fileName)
 {
@@ -173,11 +183,13 @@ vtkSmartPointer<vtkPolyData> MyReadPolyData(const char* fileName)
       return nullptr;
   }
 
+  // Below, It's just verify to translate everything in polydata
   vtkIdType numPoints = rawPoly->GetNumberOfPoints();
   std::cerr << "MyRead raw polydata points=" << numPoints << std::endl;
 
   // Ensure mesh is triangulated
-  #if 1  // translate triangled poly
+  #define USE_TRY_TRIANGLED 0
+  #if USE_TRY_TRIANGLED  // translate triangled poly
   vtkNew<vtkTriangleFilter> triaf;
   triaf->SetInputData(rawPoly);
   triaf->Update();
@@ -205,12 +217,12 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
 
   if (!points || !points->GetData())
   {
-      std::cerr << "MyRead invalid points after filter" << std::endl; // points is null, Why can't get point data through vtkPoints? but we can traverse point data via vtkPolyData's GetPoint()
+      std::cerr << "MyRead invalid points" << std::endl; // points is null, Why can't get point data through vtkPoints? but we can traverse point data via vtkPolyData's GetPoint()
       return poly;
   }
 
   numPoints = poly->GetNumberOfPoints();
-  std::cerr << "MyRead points=" << numPoints << " after filter" << std::endl;
+  std::cerr << "MyRead points=" << numPoints << std::endl;
 
   vtkPointData* pointData = poly->GetPointData();
   vtkCellData* cellData = poly->GetCellData();
@@ -488,25 +500,4 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
     }
 
     return poly;
-}
-
-vtkUnsignedCharArray* MapScalarsFromPolyData(vtkPolyData* poly, const char* scalarName, bool useCellData)
-{
-    vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->SetInputData(poly);
-    mapper->SetScalarVisibility(true);
-    mapper->SetScalarMode(useCellData ? VTK_SCALAR_MODE_USE_CELL_DATA : VTK_SCALAR_MODE_USE_POINT_DATA);  // default is VTK_SCALAR_MODE_USE_POINT_DATA, vtk defect automatically cell data if there is not point data
-    // mapper->SetScalarModeToUsePointFieldData(); // No Effects
-    mapper->SetColorModeToMapScalars();
-    // mapper->SelectColorArray(scalarName);
-    mapper->Update();
-
-    vtkUnsignedCharArray* mappedScalars = mapper->MapScalars(1.0);
-    std::cerr << "mapper 2 >> numcomp="
-    << mappedScalars->GetNumberOfComponents() << ", numtuple="
-    << mappedScalars->GetNumberOfTuples() << std::endl;
-
-    return mapper->MapScalars(1.0);
-}
-
 }

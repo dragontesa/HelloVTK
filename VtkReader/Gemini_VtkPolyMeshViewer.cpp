@@ -160,9 +160,7 @@ int main(int argc, char *argv[]) {
     CreateDummyVtkFile(vtkFilename); // Create the dummy file first
     #else
       // PolyData file pipeline
-    std::string vtkFilename = argv[1];
-    if (argc > 2)
-      vtkFilename = argv[2];
+    std::string vtkFilename = argv[argc-1];
     #endif
     // 1. Create a PolyData Reader
     vtkNew<vtkPolyDataReader> reader;

@@ -152,6 +152,8 @@ vtkSmartPointer<vtkPolyData> MyReadPolyData(const char* fileName)
   vtkIdType numPoints = rawPoly->GetNumberOfPoints();
   std::cerr << "MyRead raw polydata points=" << numPoints << std::endl;
 
+  return rawPoly;
+  
   // Ensure mesh is triangulated
   vtkNew<vtkTriangleFilter> triaf;
   triaf->SetInputData(rawPoly);
