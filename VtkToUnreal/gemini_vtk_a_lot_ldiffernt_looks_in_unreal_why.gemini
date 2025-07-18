@@ -1,0 +1,60 @@
+You're hitting a very common point of friction when transferring 3D data between different software environments like VTK and Unreal Engine! A "visual difference" usually points to one of a few key culprits, even if normals are present.
+
+Let's break down the likely issues and then get to calculating tangents.
+
+Why the Visual Difference? (Most Common Causes)
+    Coordinate System Mismatch (MOST LIKELY CAUSE):
+        VTK Standard: VTK uses a Z-up, right-handed coordinate system (often X-right, Y-forward, Z-up).
+        Unreal Engine Standard: Unreal Engine also uses a Z-up, right-handed coordinate system, but its internal conventions are typically X-forward, Y-right, Z-up.
+        The Problem: While both are Z-up and right-handed, the orientation of the X and Y axes can differ relative to how you perceive your model. This often leads to the model appearing rotated (e.g., 90 degrees around Z or X) or mirrored when imported.
+
+        Solution: You need to experiment with swapping/negating axes when transferring FVector positions and FVector normals from VTK's p[0], p[1], p[2] to Unreal's (X, Y, Z).
+    Common Conversions to Try (in LoadVtkMeshAndCreateProceduralMesh):
+
+Original (VTK X, Y, Z -> UE X, Y, Z):
+C++
+
+Vertices.Add(FVector(p[0], p[1], p[2]));
+Normals.Add(FVector(n[0], n[1], n[2]));
+
+VTK X, Y, Z -> UE X, -Y, Z (Common for Y-up sources):
+C++
+
+Vertices.Add(FVector(p[0], -p[1], p[2]));
+Normals.Add(FVector(n[0], -n[1], n[2]));
+
+VTK X, Y, Z -> UE X, Z, -Y (If you see rotation around X):
+C++
+
+Vertices.Add(FVector(p[0], p[2], -p[1]));
+Normals.Add(FVector(n[0], n[2], -n[1]));
+
+VTK X, Y, Z -> UE X, -Z, Y (If you see rotation around X or Y):
+C++
+
+    Vertices.Add(FVector(p[0], -p[2], p[1]));
+    Normals.Add(FVector(n[0], -n[2], n[1]));
+
+Start with the simple FVector(p[0], p[1], p[2]) and then try the other combinations, paying attention to the visual result. The normal transformations must match the vertex transformations.
+
+Triangle Winding Order (Backface Culling):
+
+    Explanation: 3D engines typically use backface culling to avoid rendering the "inside" of an object. This is determined by the winding order of the triangle vertices (clockwise or counter-clockwise) relative to the camera. If your VTK triangles have a winding order opposite to what Unreal expects, those faces will appear invisible or black due to culling.
+
+    Solution:
+
+        VTK Side: In vtkPolyDataNormals, setting SetAutoOrientNormals(true) often helps by orienting normals consistently outwards. If the issue persists, you might need normalsFilter->FlipNormalsOn(). You can also use vtkReverseSense filter before vtkPolyDataNormals if the geometry itself has inconsistent winding.
+
+        Unreal Side: For UProceduralMeshComponent, you can use UKismetProceduralMeshLibrary::ReverseProceduralMeshFaceWinding on the generated section.
+
+Lighting Differences:
+
+    Explanation: Even with correct geometry and normals, the default lighting in a VTK viewer (simple single light) is vastly different from Unreal's sophisticated PBR (Physically Based Rendering) pipeline, multiple lights, ambient occlusion, post-processing, etc.
+
+    Solution: This isn't a "wrong" issue, just a difference. You need to apply appropriate materials in Unreal that respond to its lighting system. Ensure your material uses the vertex normal input.
+
+Material Properties:
+
+    Explanation: If your Unreal material is set to be fully metallic, or very rough, or has incorrect base color, it will look different from VTK's simple color rendering.
+
+    Solution: Start with a basic DefaultLit material in Unreal with a simple base color, roughness=0.5, metallic=0.0 to see if the lighting behaves as expected.

@@ -83,7 +83,11 @@ public:
 };
 vtkStandardNewMacro(MyCustomInteractorStyle);
 
+
+// UE에서 문제되는 코드 비교 테스트, 최종 적으로는 vtkPolyDataReader에서 읽은 vtkPolyData 그대로 리턴
 vtkSmartPointer<vtkPolyData> MyReadPolyData(const char* fileName);
+
+// polydata 파일에서 color 데이터 직접 파싱해서 갖고 오기
 vtkSmartPointer<vtkLookupTable> create_lookup_table_from_vtk(const std::string& vtkFilePath, const std::string& tableName);
 
 int main(int argc, char* argv[])
@@ -187,8 +191,8 @@ vtkSmartPointer<vtkPolyData> MyReadPolyData(const char* fileName)
   vtkIdType numPoints = rawPoly->GetNumberOfPoints();
   std::cerr << "MyRead raw polydata points=" << numPoints << std::endl;
 
-  // Ensure mesh is triangulated
-  #define USE_TRY_TRIANGLED 0
+  // Ensure mesh is triangulated, Must be triangled if use other renderer
+  #define USE_TRY_TRIANGLED 1
   #if USE_TRY_TRIANGLED  // translate triangled poly
   vtkNew<vtkTriangleFilter> triaf;
   triaf->SetInputData(rawPoly);
@@ -240,7 +244,7 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
     //   return poly;
   }
 
-  vtkDataArray* cellNormals = cellData->GetNormals();
+  vtkDataArray* cellNormals = cellData->GetNormals(); // 언리얼에서 Crash 
   std::cerr << "MyRead okay cell normals" << std::endl;
   if (!cellNormals)
   {
@@ -278,7 +282,7 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
     << cellScalars->GetNumberOfTuples() << std::endl;
     cellColorArray = vtkUnsignedCharArray::SafeDownCast(cellScalars); // Cast failed
     if (!cellColorArray) {
-      std::cerr << "cell color array none" << std::endl;
+      std::cerr << "cell color array none" << std::endl; // True
     }
     else {
       std::cerr << "MyRead okay cell color array" << ": numComp="
@@ -289,7 +293,7 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
 
   // Cell Fields and single component
   vtkFieldData* cellField  = poly->GetCellData();
-  vtkDataArray* faceAttributesFieldArray = cellField->GetArray("faceAttributes");
+  vtkDataArray* faceAttributesFieldArray = cellField->GetArray("faceAttributes");// True
   if (!faceAttributesFieldArray) {
         std::cerr << "Error: 'faceAttributes' array not found in Cell FieldData!" << std::endl;
         std::remove(fileName);
@@ -317,7 +321,7 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
     std::cout << "  Scalar range for coloring: [" << rangeMin << ", " << rangeMax << "]" << std::endl;
 
     // Add this new scalar array to the CellData as the active scalars for coloring
-    poly->GetCellData()->SetScalars(coloringScalars);
+    poly->GetCellData()->SetScalars(coloringScalars); // 언리얼에서 Crash
  
   
   // 3. Colors
@@ -418,6 +422,8 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
     std::vector<vtkIdType> Triangles;
 
     for (cells->InitTraversal(); cells->GetNextCell(npts, ptIds);++cellId) {
+      std::cerr << "cell travel => cellid="
+      <<cellId<<", npts="<< npts << std::endl;
         if (npts == 3) { // only triangled polys
            // 5-1 TRIANGLES
             std::cerr << "MyReader traverse cell "
@@ -498,6 +504,33 @@ vtkSmartPointer<vtkPolyData> poly = rawPoly;
             << tangent(2) << std::endl;
         }
     }
+
+
+    // Test VTK Array
+    float colorMap[8][4] = 
+    { 
+        { 0.0, 0.0, 0.0, 1.0 },
+        { 0.3, 0.0, 0.0, 1.0 },
+        { 0.6, 0.0, 0.0, 1.0 },
+        { 0.9, 0.0, 0.0, 1.0 },
+        { 0.9, 0.3, 0.3, 1.0 },
+        { 0.9, 0.6, 0.6, 1.0 },
+        { 0.9, 0.9, 0.9, 1.0 },
+        { 1.0, 1.0, 1.0, 1.0 }
+    };
+
+    vtkNew<vtkFloatArray> array;
+    array->SetNumberOfComponents(4);
+    // array->SetNumberOfTuples(8);
+    for (int i=0;i<8;i++) {
+        array->InsertNextTuple(colorMap[i]);
+    }
+    int numComps = array->GetNumberOfComponents();
+    int numTuples = array->GetNumberOfTuples();
+     // 4 compoentns, 8 tuples , 언리얼에서는 31 compoentns, 1 tuple
+    std::cerr << "Test vtk array numComp="
+    << numComps << ", numTuple="<< numTuples << std::endl;
+
 
     return poly;
 }

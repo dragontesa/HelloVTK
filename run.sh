@@ -2,8 +2,10 @@
 f_help()
 {
   echo "Usage is one of below"
-  echo "./run.sh VtkReader Your.vtk"
-  echo "./run.sh VtkReader MyReadPolyDataMapper Your.vtk"
+  echo "[Target Dir] [.vtk File] or"
+  echo "[Target Dir] [Executable Name] [.vtk File]"
+  echo "e.g) ./run.sh VtkReader Your.vtk"
+  echo "e.g) ./run.sh VtkReader MyReadPolyDataMapper Your.vtk"
 }
 
 if [ $# -le 1 ]; then

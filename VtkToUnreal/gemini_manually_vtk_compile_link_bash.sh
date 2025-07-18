@@ -1,0 +1,37 @@
+g++ vtk_interactive_mesh.cpp -o vtk_interactive_mesh \
+    -I/usr/include/vtk-9.1 \
+    -L/usr/lib/x86_64-linux-gnu \
+    -lvtkCommonCore-9.1 \
+    -lvtkCommonDataModel-9.1 \
+    -lvtkFiltersSources-9.1 \
+    -lvtkInteractionStyle-9.1 \
+    -lvtkRenderingCore-9.1 \
+    -lvtkRenderingOpenGL2-9.1 \
+    -lvtkFiltersModeling-9.1 \
+    -lvtkCommonColor-9.1 \
+    -lvtkRenderingContextOpenGL2-9.1 \
+    -lvtkIOParallel-9.1 \
+    -lvtkParallelCore-9.1 \
+    -lvtkIOXML-9.1 \
+    -lvtkIOImage-9.1 \
+    -lvtkIOGeometry-9.1 \
+    -lvtkIOParallel-9.1 \
+    -lvtkIOLegacy-9.1 \
+    -lvtkDomainsChemistry-9.1 \
+    -lvtkFiltersGeneric-9.1 \
+    -lvtkFiltersStatistics-9.1 \
+    -lvtkImagingCore-9.1 \
+    -lvtkImagingSources-9.1 \
+    -lvtkCommonMath-9.1 \
+    -lvtkDICOMParser-9.1 \
+    -lvtkexpat-9.1 \
+    -lvtkfreetype-9.1 \
+    -lvtkjsoncpp-9.1 \
+    -lvtklz4-9.1 \
+    -lvtkoggtheora-9.1 \
+    -lvtkpng-9.1 \
+    -lvtkpugixml-9.1 \
+    -lvtkprotobuf-9.1 \
+    -vtkzlib-9.1 \
+    -lvtk-9.1 \
+    -lGL -lSM -lICE -lX11 -lXext -lXt -lXmu -lXi -lXdamage -lXfixes -lXft -lXrandr -lXrender -lXtst -lXss -lpthread -ldl -lrt
